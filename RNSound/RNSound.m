@@ -9,6 +9,7 @@
 @implementation RNSound {
     NSMutableDictionary *_playerPool;
     NSMutableDictionary *_callbackPool;
+    NSMutableDictionary *_fadeoutTimers; // 소리 페이드 아웃 시키기
 }
 
 @synthesize _key = _key;
@@ -21,7 +22,7 @@
         [userInfo[@"AVAudioSessionInterruptionTypeKey"] longValue];
     AVAudioPlayer *player = [self playerForKey:self._key];
     if (audioSessionInterruptionType == AVAudioSessionInterruptionTypeEnded) {
-        if (player) {
+        if (player && player.isPlaying) {
             [player play];
             [self setOnPlay:YES forPlayerKey:self._key];
         }
@@ -53,6 +54,14 @@
         _callbackPool = [NSMutableDictionary new];
     }
     return _callbackPool;
+}
+
+// kosick
+- (NSMutableDictionary *)fadeoutTimers {
+    if (!_fadeoutTimers) {
+        _fadeoutTimers = [NSMutableDictionary new];
+    }
+    return _fadeoutTimers;
 }
 
 - (AVAudioPlayer *)playerForKey:(nonnull NSNumber *)key {
@@ -87,6 +96,77 @@
             [[self callbackPool] removeObjectForKey:key];
         }
     }
+}
+
+// Kosick - 모든 오디오 중지
+- (void)_pauseAllPlayers {
+  for (NSNumber *key in _playerPool) {
+    AVAudioPlayer *player = [self playerForKey:key];
+    if (player.isPlaying) {
+      [player pause];
+      [self setOnPlay:NO forPlayerKey:key];
+    }
+  }
+}
+
+// Kosick - 모든 오디오 '조금씩 페이드아웃' 중지
+- (void)_pauseFadeoutAll {
+  for (NSNumber *key in _playerPool) {
+    AVAudioPlayer *player = [self playerForKey:key];
+    if (player.isPlaying) {
+      [self fadeOutAndPausePlayer:player forKey:key];
+    }
+  }
+}
+
+// Kosick - 소리를 조금씩 줄이면서 중지. (페이드아웃)
+- (void)fadeOutAndPausePlayer:(AVAudioPlayer *)player forKey:(NSNumber *)key {
+  CGFloat fadeOutDuration = 2.0; // Time in seconds for the fade-out effect
+  CGFloat fadeOutStep = 0.1;     // how much to decrease the volume at each step
+  CGFloat minimumVolumeThreshold = 0.05; // The minimum volume threshold
+
+  // Schedule a timer to gradually decrease the volume
+  NSTimer *fadeOutTimer =
+      [NSTimer timerWithTimeInterval:fadeOutDuration * fadeOutStep
+                              target:self
+                            selector:@selector(decreaseVolumeAndCheck:)
+                            userInfo:@{
+                              @"player" : player,
+                              @"key" : key,
+                              @"step" : @(fadeOutStep),
+                              @"threshold" : @(minimumVolumeThreshold)
+                            }
+                             repeats:YES];
+
+  // Add the timer to the run loop
+  [[NSRunLoop mainRunLoop] addTimer:fadeOutTimer forMode:NSRunLoopCommonModes];
+  // Store the timer in the timers dictionary
+  [self.fadeoutTimers setObject:fadeOutTimer forKey:key];
+}
+
+// Kosick - 페이드아웃 timer 콜백함수
+- (void)decreaseVolumeAndCheck:(NSTimer *)timer {
+  AVAudioPlayer *player = timer.userInfo[@"player"];
+  NSNumber *key = timer.userInfo[@"key"];
+  CGFloat fadeOutStep = [timer.userInfo[@"step"] floatValue];
+  CGFloat minimumVolumeThreshold = [timer.userInfo[@"threshold"] floatValue];
+
+  if (player.volume > minimumVolumeThreshold) {
+    player.volume -= fadeOutStep;
+  } else {
+    [player pause];
+    [self setOnPlay:NO forPlayerKey:key];
+    [timer invalidate];
+    [self.fadeoutTimers removeObjectForKey:key];
+  }
+}
+
+// Kosick - timer invalidate (pause 시에 호출)
+- (void)_invalidateTimer {
+  if (self._timer) {
+    [self._timer invalidate];
+    self._timer = nil;
+  }
 }
 
 RCT_EXPORT_MODULE();
@@ -175,8 +255,10 @@ RCT_EXPORT_METHOD(setCategory
     if (category) {
         if (mixWithOthers) {
             [session setCategory:category
-                     withOptions:AVAudioSessionCategoryOptionMixWithOthers |
-                                 AVAudioSessionCategoryOptionAllowBluetooth
+                     withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                    // kosick) 이거떄문에 background 잘 안돌아서 patch 함. 참고)
+                    // https://github.com/zmxv/react-native-sound/issues/788 |
+                    // AVAudioSessionCategoryOptionAllowBluetooth
                            error:nil];
         } else {
             [session setCategory:category error:nil];
@@ -260,14 +342,39 @@ RCT_EXPORT_METHOD(play
     }
 }
 
+// Kosick - 타이머로 일정시간 후에 모든 오디오 FADEOUT 정지
+RCT_EXPORT_METHOD(pauseAllPlayersTimer : (nonnull NSNumber *)timerDuration) {
+  NSTimeInterval duration = [timerDuration doubleValue];
+  self._timer =
+      [NSTimer timerWithTimeInterval:duration
+                              target:self
+                            selector:@selector(_pauseFadeoutAll)
+                            // selector:@selector(_pauseAllPlayers) <- 원래는 fadeout 이 아니라 그냥 정지였다.
+                            userInfo:nil
+                             repeats:NO];
+  [[NSRunLoop mainRunLoop] addTimer:self._timer forMode:NSRunLoopCommonModes];
+}
+
+// Kosick - 즉시 모든 타이머 Invalidate
+RCT_EXPORT_METHOD(invalidateTimer) { [self _invalidateTimer]; }
+
+// Kosick - 즉시 모든 Player pause
+RCT_EXPORT_METHOD(pauseAllPlayers) { [self _pauseAllPlayers]; }
+
+// Kosick - 기존 함수인데 setOnPlay 알려주는 방식을 추가함.
 RCT_EXPORT_METHOD(pause
                   : (nonnull NSNumber *)key withCallback
                   : (RCTResponseSenderBlock)callback) {
-    AVAudioPlayer *player = [self playerForKey:key];
-    if (player) {
-        [player pause];
-        callback([NSArray array]);
+
+  AVAudioPlayer *player = [self playerForKey:key];
+  if (player) {
+    if (player.isPlaying) {
+      // RCTLogInfo(@"-------key: %@ pause FIRED", key);
+      [self setOnPlay:NO forPlayerKey:key]; // 이벤트 단에 알려준다. (Kosick)
     }
+    [player pause];
+    callback([NSArray array]);
+  }
 }
 
 RCT_EXPORT_METHOD(stop

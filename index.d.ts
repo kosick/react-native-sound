@@ -197,6 +197,27 @@ declare class Sound {
    * Whether the player is playing or not.
    */
   isPlaying(): boolean
+
+  /**
+   * Kosick - pause 같은거 할 때 모든 타이머 그냥 리셋시키기 (invalidate)
+   */
+  static invalidateTimer(): void
+
+  /**
+   * Kosick - duration 시간만큼 지난 뒤에 모든 플레이어 일시정지
+   * @param duration 
+   */
+  static pauseAllPlayersTimer(duration: number): void
+
+  /**
+   * Kosick - 모든 플레이어 일시정지
+   */
+  static pauseAllPlayers(): void
 }
 
-export = Sound;
+/** 
+ * Kosick - event emitter 따로 빼놓기
+ */
+const soundEventEmitter: NativeEventEmitter;
+
+export { Sound, soundEventEmitter };

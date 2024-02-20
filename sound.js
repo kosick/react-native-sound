@@ -49,29 +49,32 @@ function Sound(filename, basePath, onError, options) {
     }
   }
 
-  this.registerOnPlay = function() {
-    if (this.onPlaySubscription != null) {
-      console.warn('On Play change event listener is already registered');
-      return;
-    }
+  // Kosick - 이부분 따로 이벤트 리스너를 등록하지 않고 필요한 곳에서 한번만 등록하도록 변경.
+  // [주의] 이 부분을 제거해서 _playing 을 쓰는 로직은 이제 동작하지 않는다.
+  // this.registerOnPlay = function() {
+  //   if (this.onPlaySubscription != null) {
+  //     console.warn('On Play change event listener is already registered');
+  //     return;
+  //   }
 
-    if (!IsWindows) {
-      this.onPlaySubscription = eventEmitter.addListener(
-        'onPlayChange',
-        (param) => {
-          const { isPlaying, playerKey } = param;
-          if (playerKey === this._key) {
-            if (isPlaying) {
-              this._playing = true;
-            }
-            else {
-              this._playing = false;
-            }
-          }
-        },
-      );
-    }
-  }
+  //   if (!IsWindows) {
+  //     this.onPlaySubscription = eventEmitter.addListener(
+  //       'onPlayChange',
+  //       (param) => {
+  //         const { isPlaying, playerKey } = param;
+
+  //         if (playerKey === this._key) {
+  //           if (isPlaying) {
+  //             this._playing = true;
+  //           }
+  //           else {
+  //             this._playing = false;
+  //           }
+  //         }
+  //       },
+  //     );
+  //   }
+  // }
 
   this._loaded = false;
   this._key = nextKey++;
@@ -94,7 +97,7 @@ function Sound(filename, basePath, onError, options) {
     }
     if (error === null) {
       this._loaded = true;
-      this.registerOnPlay();
+      // this.registerOnPlay(); // Kosick - 이부분 따로 이벤트 리스너를 등록하지 않고 필요한 곳에서 한번만 등록하도록 변경.
     }
     onError && onError(error, props);
   });
@@ -325,9 +328,27 @@ Sound.setSpeakerPhone = function(value) {
   }
 }
 
+// Kosick - 모든 사운드 타이머 멈추는거
+Sound.pauseAllPlayers = function() {
+  RNSound.pauseAllPlayers();
+}
+
+// Kosick - x 초 후에 모든 사운드 타이머 멈추는거
+Sound.pauseAllPlayersTimer = function(value) {
+  RNSound.pauseAllPlayersTimer(value);
+}
+
+// Kosick - 강제 타이머 invalidate (pause 시에 호출)
+Sound.invalidateTimer = function() {
+  RNSound.invalidateTimer();
+}
+
 Sound.MAIN_BUNDLE = RNSound.MainBundlePath;
 Sound.DOCUMENT = RNSound.NSDocumentDirectory;
 Sound.LIBRARY = RNSound.NSLibraryDirectory;
 Sound.CACHES = RNSound.NSCachesDirectory;
 
-module.exports = Sound;
+module.exports = {
+  Sound,
+  soundEventEmitter: eventEmitter,
+};
