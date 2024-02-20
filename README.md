@@ -1,4 +1,4 @@
-# react-native-sound
+# react-native-sound (kosick fixed version)
 
 [![](https://img.shields.io/npm/v/react-native-sound.svg?style=flat-square)][npm]
 [![](https://img.shields.io/npm/l/react-native-sound.svg?style=flat-square)][npm]

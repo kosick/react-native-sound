@@ -20,6 +20,7 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.facebook.react.modules.core.ExceptionsManagerModule;
 
 import java.io.File;
+import java.util.Iterator;
 import java.util.HashMap;
 import java.util.Map;
 import java.io.IOException;
@@ -225,7 +226,7 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
   public void play(final Double key, final Callback callback) {
     MediaPlayer player = this.playerPool.get(key);
     if (player == null) {
-      setOnPlay(false, key);
+      setOnPlay(false, key); // kosick (event 발생용도로 추가)
       if (callback != null) {
           callback.invoke(false);
       }
@@ -300,7 +301,7 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
     if (player != null && player.isPlaying()) {
       player.pause();
       player.seekTo(0);
-      setOnPlay(false, key);
+      setOnPlay(false, key);  // kosick (event 발생용도로 추가)
     }
 
     // Release audio focus in Android system
@@ -495,5 +496,19 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
   @ReactMethod
   public void removeListeners(Integer count) {
     // Keep: Required for RN built in Event Emitter Calls.
+  }
+
+  // Kosick - 모든 오디오 중지
+  @ReactMethod
+  public void pauseAllPlayers() {
+    Iterator<Map.Entry<Double, MediaPlayer>> it = playerPool.entrySet().iterator();
+    while (it.hasNext()) {
+      Map.Entry<Double, MediaPlayer> entry = it.next();
+      MediaPlayer player = entry.getValue();
+      if (player != null && player.isPlaying()) {
+        player.pause();
+        setOnPlay(false, entry.getKey());
+      }
+    }
   }
 }

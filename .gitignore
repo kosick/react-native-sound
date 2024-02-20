@@ -40,3 +40,4 @@ pids
 
 # dotenv environment variables file
 .env
+android/.gradle/*
