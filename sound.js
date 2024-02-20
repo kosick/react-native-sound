@@ -158,6 +158,11 @@ Sound.prototype.release = function() {
   return this;
 };
 
+// Kosick - 직접 key 구하기
+Sound.prototype.getKey = function() {
+  return this._key;
+};
+
 Sound.prototype.getFilename = function() {
   return this._filename;
 };

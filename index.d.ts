@@ -199,6 +199,11 @@ declare class Sound {
   isPlaying(): boolean
 
   /**
+   * Kosick - 현재 Sound의 키값
+   */
+  getKey(): number
+
+  /**
    * Kosick - pause 같은거 할 때 모든 타이머 그냥 리셋시키기 (invalidate)
    */
   static invalidateTimer(): void

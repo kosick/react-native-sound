@@ -286,6 +286,7 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
     MediaPlayer player = this.playerPool.get(key);
     if (player != null && player.isPlaying()) {
       player.pause();
+      setOnPlay(false, key);
     }
 
     if (callback != null) {
@@ -299,6 +300,7 @@ public class RNSoundModule extends ReactContextBaseJavaModule implements AudioMa
     if (player != null && player.isPlaying()) {
       player.pause();
       player.seekTo(0);
+      setOnPlay(false, key);
     }
 
     // Release audio focus in Android system
