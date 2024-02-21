@@ -7,7 +7,7 @@ var IsWindows = RNSound.IsWindows;
 var resolveAssetSource = require("react-native/Libraries/Image/resolveAssetSource");
 var eventEmitter = new ReactNative.NativeEventEmitter(RNSound);
 
-var nextKey = 0;
+var nextKey = 1; // (kosick) 1 부터 시작해야 외부 사용 시에 key 로 제어문 쓰기가 좋다. orig code 는 0부터 시작했음.
 
 function isRelativePath(path) {
   return !/^(\/|http(s?)|asset|file)/.test(path);
